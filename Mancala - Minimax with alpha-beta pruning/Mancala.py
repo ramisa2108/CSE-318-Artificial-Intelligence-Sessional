@@ -1,8 +1,9 @@
 import time
+
+
 class Mancala:
 
 	def __init__(self, player1, player2):
-
 		self.player1 = player1
 		self.player2 = player2
 		self.player1.set_opponent(self.player2)
@@ -39,7 +40,7 @@ class Mancala:
 		print(current_player.player_name + "'s move.")
 
 		chosen_bin = current_player.get_bin_choice()
-		current_player_board, opponent_player_board, special_state = \
+		current_player_board, opponent_player_board, special_state, _ = \
 			current_player.make_move([current_player.board, opponent_player.board], chosen_bin)
 		if current_player_board is None:
 			return -1
