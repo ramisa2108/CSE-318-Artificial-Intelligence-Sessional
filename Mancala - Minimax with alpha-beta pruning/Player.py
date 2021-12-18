@@ -17,8 +17,6 @@ class Player:
 		self.heuristic = heuristic
 		self.heuristic_function = None
 		self.get_heuristic_function()
-		self.order = list(range(1, self.number_of_bins+1))
-		random.shuffle(self.order)
 
 	def get_heuristic_function(self):
 
@@ -113,7 +111,14 @@ class Player:
 		for i in range(2):
 			if sum(boards[i][1:]) == 0:
 				boards[1-i] = [sum(boards[1-i])] + [0] * self.number_of_bins
-				special_state = 1
+				if boards[0][0] > boards[1][0]:
+					special_state = 1
+				elif boards[0][0] < boards[1][0]:
+					special_state = -1
+				elif i == 0:
+					special_state = -1
+				else:
+					special_state = 1
 				break
 
 		# check free move
@@ -124,70 +129,86 @@ class Player:
 		return own_new_board, opponent_new_board, special_state, captured
 
 	def choose_best_move(self):
-
-		st = time.time()
 		root_node = Node()
+		val = self.max_player_tree(root_node, [copy.deepcopy(self.board), copy.deepcopy(self.opponent.board)], 0, float('-inf'), float('inf'))
+		print("Best move for ", self.player_name, ":", root_node.best_child.chosen_bin, ", possible score: ", val)
 
-		self.build_game_tree(root_node, [copy.deepcopy(self.board), copy.deepcopy(self.opponent.board)])
-		print("Best move for ", self.player_name, ":", root_node.best_child.chosen_bin, ", possible score: ", root_node.best_val)
-		en = time.time()
-		print(en - st, "Seconds")
 		return root_node.best_child.chosen_bin
 
-	def build_game_tree(self, current_node, current_boards, current_level=0, alpha=float('-inf'), beta=float('inf')):
+	def max_player_tree(self, current_node, current_boards, current_level, alpha, beta):
+		val = float('-inf')
+		order = list(range(1, self.number_of_bins + 1))
+		random.shuffle(order)
 
 		if current_level < self.max_depth:
-
-			for i in self.order:
-
-				if current_level % 2 == 0:
-					relative_board = copy.deepcopy(current_boards)
-					b0, b1, special_state, captured = self.make_move(relative_board, i)
-				else:
-					relative_board = [copy.deepcopy(current_boards[1]), copy.deepcopy(current_boards[0])]
-					b1, b0, special_state, captured = self.make_move(relative_board, i)
+			for i in order:
+				relative_board = copy.deepcopy(current_boards)
+				b0, b1, special_state, captured = self.make_move(relative_board, i)
 
 				if b0 is None:
 					continue
 
-				if special_state != 2:
-					new_node = Node(i, current_node, 1-current_node.node_type)
-				else:
-					new_node = Node(i, current_node, current_node.node_type)
+				if special_state == 2:
+					new_node = Node(i, current_node, 1)
+					new_node.free_rounds += 1
+					v = self.max_player_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level, alpha, beta)
 
-				if captured > 0 and new_node.node_type == 1:
+				elif special_state == 0:
+					new_node = Node(i, current_node, 0)
 					new_node.captured += captured
-
-				if special_state == 0:  # normal game
-					self.build_game_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level+1, alpha, beta)
-				elif special_state == 1:  # someone won
-					new_node.best_val = self.heuristic_function([b0[:], b1[:]], new_node)
-
-				else:  # free round
-					if new_node.node_type == 1:
-						new_node.free_rounds += 1
-					self.build_game_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level, alpha, beta)
-
-				if current_level % 2 == 0:
-					if current_node.best_val is None or new_node.best_val > current_node.best_val:
-						current_node.best_val = new_node.best_val
-						current_node.best_child = new_node
-
-					if current_node.parent_node is not None:
-						beta_val = current_node.get_prev_beta()
-						if beta_val is not None and current_node.best_val >= beta_val:
-							break
+					v = self.min_player_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level + 1, alpha, beta)
 
 				else:
-					if current_node.best_val is None or new_node.best_val < current_node.best_val:
-						current_node.best_val = new_node.best_val
-						current_node.best_child = new_node
+					new_node = Node(i, current_node, 0)
+					new_node.captured += captured
+					v = self.heuristic_function([b0[:], b1[:]], new_node)
 
-					if current_node.parent_node is not None:
-						alpha_val = current_node.get_prev_alpha()
-						if alpha_val is not None and current_node.best_val <= alpha_val:
-							break
+				if v > val:
+					val = v
+					current_node.best_child = new_node
 
+				if val >= beta:
+					return val
+				alpha = max(alpha, val)
 		else:
-			current_node.best_val = self.heuristic_function(current_boards, current_node)
+			val = self.heuristic_function(current_boards, current_node)
+		return val
+
+	def min_player_tree(self, current_node, current_boards, current_level, alpha, beta):
+
+		val = float('inf')
+		order = list(range(1, self.number_of_bins + 1))
+		random.shuffle(order)
+
+		if current_level < self.max_depth:
+
+			for i in order:
+				relative_board = [copy.deepcopy(current_boards[1]), copy.deepcopy(current_boards[0])]
+				b1, b0, special_state, captured = self.make_move(relative_board, i)
+
+				if b0 is None:
+					continue
+
+				if special_state == 2:
+					new_node = Node(i, current_node, 0)
+					#new_node.free_rounds += 1
+					v = self.min_player_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level, alpha, beta)
+
+				elif special_state == 0:
+					new_node = Node(i, current_node, 1)
+					v = self.max_player_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level + 1, alpha, beta)
+
+				else:
+					new_node = Node(i, current_node, 0)
+					v = self.heuristic_function([b0[:], b1[:]], new_node)
+
+				if v < val:
+					val = v
+					current_node.best_child = new_node
+				if val <= alpha:
+					return val
+				beta = min(beta, val)
+		else:
+			val = self.heuristic_function(current_boards, current_node)
+		return val
 

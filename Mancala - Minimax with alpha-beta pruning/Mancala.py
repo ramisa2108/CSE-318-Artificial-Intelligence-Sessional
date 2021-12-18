@@ -21,8 +21,14 @@ class Mancala:
 				game_state = self.make_move(self.player2, self.player1)
 
 			self.print_game()
-			if game_state == 1:  # someone won
-				self.get_winner()
+			if game_state == 1:  # player1 won
+				print(self.player1.player_name, "Won!")
+				res = 1;
+				break
+
+			elif game_state == -1:  # player2 won
+				print(self.player2.player_name, "Won!")
+				res = 2
 				break
 			elif game_state == 0:  # normal game
 				self.round += 1
@@ -34,6 +40,7 @@ class Mancala:
 
 		end_time = time.time()
 		print("Total time taken =", end_time - start_time)
+		return res
 
 	def make_move(self, current_player, opponent_player):
 
@@ -55,8 +62,8 @@ class Mancala:
 			print(self.player1.player_name, "Won!")
 		elif self.player1.board[0] < self.player2.board[0]:
 			print(self.player2.player_name, "Won!")
-		else:
-			print("Game Tied!")
+		elif self.round % 2 == 0:
+			print("")
 
 	def print_game(self):
 

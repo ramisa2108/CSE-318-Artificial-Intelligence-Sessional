@@ -8,11 +8,6 @@ class Node:
 		self.node_type = node_type
 		self.free_rounds = 0
 		self.captured = 0
-		if node_type == 1:
-			self.best_val = self.get_prev_alpha()
-		else:
-			self.best_val = self.get_prev_beta()
-
 		if parent_node is not None:
 			self.free_rounds = parent_node.free_rounds
 			self.captured = parent_node.captured
