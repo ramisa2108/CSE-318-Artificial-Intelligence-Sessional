@@ -20,13 +20,17 @@ class Mancala:
 			else:
 				game_state = self.make_move(self.player2, self.player1)
 
+			if game_state is None:   # invalid move
+				print("Invalid Move.")
+				continue
+
 			self.print_game()
-			if game_state == 1:  # player1 won
+			if (game_state == 1 and self.round % 2 == 0) or (game_state == -1 and self.round % 2 == 1):  # player1 won
 				print(self.player1.player_name, "Won!")
-				res = 1;
+				res = 1
 				break
 
-			elif game_state == -1:  # player2 won
+			elif (game_state == -1 and self.round % 2 == 0) or (game_state == 1 and self.round % 2 == 1):  # player2 won
 				print(self.player2.player_name, "Won!")
 				res = 2
 				break
@@ -34,9 +38,6 @@ class Mancala:
 				self.round += 1
 			elif game_state == 2:  # free round for current player
 				print("Free Round.")
-			else:   # invalid move
-				print("Invalid Move.")
-				continue
 
 		end_time = time.time()
 		print("Total time taken =", end_time - start_time)
@@ -47,23 +48,17 @@ class Mancala:
 		print(current_player.player_name + "'s move.")
 
 		chosen_bin = current_player.get_bin_choice()
+
 		current_player_board, opponent_player_board, special_state, _ = \
 			current_player.make_move([current_player.board, opponent_player.board], chosen_bin)
+
 		if current_player_board is None:
-			return -1
+			return None
 
 		current_player.update_board(current_player_board)
 		opponent_player.update_board(opponent_player_board)
 
 		return special_state
-
-	def get_winner(self):
-		if self.player1.board[0] > self.player2.board[0]:
-			print(self.player1.player_name, "Won!")
-		elif self.player1.board[0] < self.player2.board[0]:
-			print(self.player2.player_name, "Won!")
-		elif self.round % 2 == 0:
-			print("")
 
 	def print_game(self):
 

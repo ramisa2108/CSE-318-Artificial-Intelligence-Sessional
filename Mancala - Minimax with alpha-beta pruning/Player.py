@@ -1,6 +1,5 @@
 from Node import Node
 import copy
-import time
 import random
 
 
@@ -33,23 +32,29 @@ class Player:
 		else:
 			self.heuristic_function = self.heuristic_6
 
-	def heuristic_1(self, boards, node):
+	# number of stones in storage
+	def heuristic_1(self, boards, free_rounds=0, captured=0):
 		return boards[0][0] - boards[1][0]
 
-	def heuristic_2(self, boards, node):
-		return 10 * self.heuristic_1(boards, node) + 5 * (sum(boards[0][1:]) - sum(boards[1][1:]))
+	# number of stones in storage and in the bins
+	def heuristic_2(self, boards,  free_rounds=0, captured=0):
+		return (2 * self.heuristic_1(boards) + 1 * (sum(boards[0][1:]) - sum(boards[1][1:]))) / 3
 
-	def heuristic_3(self, boards, node):
-		return self.heuristic_2(boards, node) + 2 * node.free_rounds
+	# number of stones in storage and the bins and the number of free rounds earned for this move
+	def heuristic_3(self, boards,  free_rounds=0, captured=0):
+		return (3 * self.heuristic_2(boards) + 2 * free_rounds) / 5
 
-	def heuristic_4(self, boards, node):
-		return self.heuristic_1(boards, node) + 2 * node.captured
+	# number of stones in storage and total stones captured for this move
+	def heuristic_4(self, boards,  free_rounds=0, captured=0):
+		return (3 * self.heuristic_1(boards) + 2 * captured) / 5
 
-	def heuristic_5(self, boards, node):
+	# how close the players' storage is to being half full
+	def heuristic_5(self, boards,  free_rounds=0, captured=0):
 		half_stones = (self.number_of_stones * self.number_of_bins) // 2
-		return 5 * (boards[0][0] - half_stones) - 3 * (boards[1][0] - half_stones)
+		return 1.5 * (boards[0][0] - half_stones) - 0.5 * (boards[1][0] - half_stones)
 
-	def heuristic_6(self, boards, node):
+	# how close the stones are to the player's storage
+	def heuristic_6(self, boards,  free_rounds=0, captured=0):
 
 		close_to_my_storage = boards[0][0]
 		for i in range(1, self.number_of_bins+1):
@@ -129,18 +134,23 @@ class Player:
 		return own_new_board, opponent_new_board, special_state, captured
 
 	def choose_best_move(self):
+
 		root_node = Node()
 		val = self.max_player_tree(root_node, [copy.deepcopy(self.board), copy.deepcopy(self.opponent.board)], 0, float('-inf'), float('inf'))
 		print("Best move for ", self.player_name, ":", root_node.best_child.chosen_bin, ", possible score: ", val)
-
 		return root_node.best_child.chosen_bin
 
-	def max_player_tree(self, current_node, current_boards, current_level, alpha, beta):
+	def max_player_tree(
+			self, current_node, current_boards, current_level, alpha, beta,
+			current_free_rounds=0, current_captured=0
+	):
+
 		val = float('-inf')
 		order = list(range(1, self.number_of_bins + 1))
 		random.shuffle(order)
 
 		if current_level < self.max_depth:
+
 			for i in order:
 				relative_board = copy.deepcopy(current_boards)
 				b0, b1, special_state, captured = self.make_move(relative_board, i)
@@ -149,19 +159,27 @@ class Player:
 					continue
 
 				if special_state == 2:
-					new_node = Node(i, current_node, 1)
-					new_node.free_rounds += 1
-					v = self.max_player_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level, alpha, beta)
+					new_node = Node(i)
+					current_free_rounds += 1
+					v = self.max_player_tree(
+						new_node, copy.deepcopy([b0[:], b1[:]]), current_level,
+						alpha, beta, current_free_rounds, current_captured
+					)
 
 				elif special_state == 0:
-					new_node = Node(i, current_node, 0)
-					new_node.captured += captured
-					v = self.min_player_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level + 1, alpha, beta)
+					new_node = Node(i)
+					current_captured += captured
+					v = self.min_player_tree(
+						new_node, copy.deepcopy([b0[:], b1[:]]), current_level + 1, alpha, beta,
+						current_free_rounds, current_captured
+					)
 
 				else:
-					new_node = Node(i, current_node, 0)
-					new_node.captured += captured
-					v = self.heuristic_function([b0[:], b1[:]], new_node)
+					new_node = Node(i)
+					current_captured += captured
+					v = self.heuristic_function([b0[:], b1[:]], current_free_rounds, current_captured)
+
+				current_node.children.append(new_node)
 
 				if v > val:
 					val = v
@@ -171,10 +189,13 @@ class Player:
 					return val
 				alpha = max(alpha, val)
 		else:
-			val = self.heuristic_function(current_boards, current_node)
+			val = self.heuristic_function(current_boards, current_free_rounds, current_captured)
 		return val
 
-	def min_player_tree(self, current_node, current_boards, current_level, alpha, beta):
+	def min_player_tree(
+			self, current_node, current_boards, current_level, alpha, beta,
+			current_free_rounds=0, current_captured=0
+	):
 
 		val = float('inf')
 		order = list(range(1, self.number_of_bins + 1))
@@ -190,17 +211,24 @@ class Player:
 					continue
 
 				if special_state == 2:
-					new_node = Node(i, current_node, 0)
-					#new_node.free_rounds += 1
-					v = self.min_player_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level, alpha, beta)
+					new_node = Node(i)
+					v = self.min_player_tree(
+						new_node, copy.deepcopy([b0[:], b1[:]]), current_level, alpha, beta,
+						current_free_rounds, current_captured
+					)
 
 				elif special_state == 0:
-					new_node = Node(i, current_node, 1)
-					v = self.max_player_tree(new_node, copy.deepcopy([b0[:], b1[:]]), current_level + 1, alpha, beta)
+					new_node = Node(i)
+					v = self.max_player_tree(
+						new_node, copy.deepcopy([b0[:], b1[:]]), current_level + 1, alpha, beta,
+						current_free_rounds, current_captured
+					)
 
 				else:
-					new_node = Node(i, current_node, 0)
-					v = self.heuristic_function([b0[:], b1[:]], new_node)
+					new_node = Node(i)
+					v = self.heuristic_function([b0[:], b1[:]], current_free_rounds, current_captured)
+
+				current_node.children.append(new_node)
 
 				if v < val:
 					val = v
@@ -209,6 +237,6 @@ class Player:
 					return val
 				beta = min(beta, val)
 		else:
-			val = self.heuristic_function(current_boards, current_node)
+			val = self.heuristic_function(current_boards, current_free_rounds, current_captured)
 		return val
 
